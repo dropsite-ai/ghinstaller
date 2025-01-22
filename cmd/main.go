@@ -16,7 +16,9 @@ func main() {
 	token := flag.String("token", "", "GitHub Personal Access Token. Defaults to GITHUB_TOKEN environment variable if not provided.")
 	destDir := flag.String("dest", "./binaries", "Destination directory for downloaded binaries.")
 	repos := flag.String("repos", "", "Comma-separated list of GitHub repositories in 'owner/repo' format. (Required)")
-	publicDNS := flag.String("publicDNS", "", "Public DNS of the EC2 instance for deployment. (Required)")
+	sshUser := flag.String("sshuser", "ec2-user", "SSH username for the target server. (Default: ec2-user)")
+	homeDir := flag.String("homedir", "/home/ec2-user", "Home directory on the target server. (Default: /home/ec2-user)")
+	publicDNS := flag.String("publicdns", "", "Public DNS of the EC2 instance for deployment. (Required)")
 	keyPath := flag.String("key", "", "Path to the private key for SSH. (Required)")
 	match := flag.String("match", "", "Substring to filter assets by name during download. (Optional)")
 
@@ -57,7 +59,7 @@ func main() {
 
 	// Deploy the binaries
 	fmt.Println("Starting deployment...")
-	if err := ghinstaller.Run(*publicDNS, *keyPath, binPaths); err != nil {
+	if err := ghinstaller.Run(*publicDNS, *keyPath, *sshUser, *homeDir, binPaths); err != nil {
 		log.Fatalf("Error deploying binaries: %v", err)
 	}
 

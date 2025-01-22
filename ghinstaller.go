@@ -8,40 +8,41 @@ import (
 	"sync"
 )
 
-func Run(publicDNS, keyPath string, binPaths []string) error {
-	log.Printf("Deploying binaries to EC2 instance %s", publicDNS)
+func Run(publicDNS, keyPath, sshUser, homeDir string, binPaths []string) error {
+	log.Printf("Deploying binaries to server %s@%s", sshUser, publicDNS)
 
 	// Set up home directory
-	createBinDirCmd := "mkdir -p /home/ec2-user/bin /home/ec2-user/bin.old && chmod 0700 /home/ec2-user /home/ec2-user/bin /home/ec2-user/bin.old"
-	if _, err := ExecuteSSHCommand(publicDNS, keyPath, createBinDirCmd); err != nil {
+	createBinDirCmd := fmt.Sprintf("mkdir -p %s/bin %s/bin.old && chmod 0700 %s %s/bin %s/bin.old", homeDir, homeDir, homeDir, homeDir, homeDir)
+	if _, err := ExecuteSSHCommand(publicDNS, keyPath, sshUser, createBinDirCmd); err != nil {
 		return fmt.Errorf("failed to create bin directories: %v", err)
 	}
 
 	// Upload binaries concurrently
 	var wg sync.WaitGroup
 	for _, binPath := range binPaths {
-		wg.Add(1) // Add a counter for each goroutine
+		wg.Add(1)
 		go func(p string) {
-			defer wg.Done() // Decrease the counter when the goroutine completes
-			if _, err := ExecuteSCPCommand(publicDNS, keyPath, p); err != nil {
+			defer wg.Done()
+			if _, err := ExecuteSCPCommand(publicDNS, keyPath, sshUser, homeDir, p); err != nil {
 				fmt.Printf("failed to transfer %s: %v\n", p, err)
 			}
 		}(binPath)
 	}
 
-	wg.Wait() // Wait for all goroutines to complete
-
+	wg.Wait()
 	log.Println("Successfully deployed binaries")
 	return nil
 }
 
-func ExecuteSSHCommand(publicDNS, keyPath, command string) (string, error) {
-	return ExecuteCommand(fmt.Sprintf(`ssh -i %s ec2-user@%s '%s'`, keyPath, publicDNS, command))
+func ExecuteSSHCommand(publicDNS, keyPath, sshUser, command string) (string, error) {
+	cmd := fmt.Sprintf(`ssh -i %s %s@%s '%s'`, keyPath, sshUser, publicDNS, command)
+	return ExecuteCommand(cmd)
 }
 
-func ExecuteSCPCommand(publicDNS, keyPath, binPath string) (string, error) {
+func ExecuteSCPCommand(publicDNS, keyPath, sshUser, homeDir, binPath string) (string, error) {
 	name := filepath.Base(binPath)
-	return ExecuteCommand(fmt.Sprintf("scp -i %s %s ec2-user@%s:/home/ec2-user/bin/%s", keyPath, binPath, publicDNS, name))
+	cmd := fmt.Sprintf("scp -i %s %s %s@%s:%s/bin/%s", keyPath, binPath, sshUser, publicDNS, homeDir, name)
+	return ExecuteCommand(cmd)
 }
 
 func ExecuteCommand(command string) (string, error) {
