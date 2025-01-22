@@ -11,10 +11,14 @@ import (
 func Run(publicDNS, keyPath, sshUser, homeDir string, binPaths []string) error {
 	log.Printf("Deploying binaries to server %s@%s", sshUser, publicDNS)
 
-	// Set up home directory
-	createBinDirCmd := fmt.Sprintf("mkdir -p %s/bin %s/bin.old && chmod 0700 %s %s/bin %s/bin.old", homeDir, homeDir, homeDir, homeDir, homeDir)
-	if _, err := ExecuteSSHCommand(publicDNS, keyPath, sshUser, createBinDirCmd); err != nil {
-		return fmt.Errorf("failed to create bin directories: %v", err)
+	// Set up home and bin directories
+	setupDirsCmd := fmt.Sprintf(`
+		mkdir -p %s/bin %s/bin.old &&
+		chmod 0700 %s %s/bin %s/bin.old`,
+		homeDir, homeDir, homeDir, homeDir, homeDir,
+	)
+	if _, err := ExecuteSSHCommand(publicDNS, keyPath, sshUser, setupDirsCmd); err != nil {
+		return fmt.Errorf("failed to create and set up bin directories: %v", err)
 	}
 
 	// Upload binaries concurrently
@@ -24,13 +28,49 @@ func Run(publicDNS, keyPath, sshUser, homeDir string, binPaths []string) error {
 		go func(p string) {
 			defer wg.Done()
 			if _, err := ExecuteSCPCommand(publicDNS, keyPath, sshUser, homeDir, p); err != nil {
-				fmt.Printf("failed to transfer %s: %v\n", p, err)
+				fmt.Printf("Failed to transfer %s: %v\n", p, err)
 			}
 		}(binPath)
 	}
-
 	wg.Wait()
-	log.Println("Successfully deployed binaries")
+
+	// Install binaries under /usr/local/bin
+	if err := InstallBinaries(publicDNS, keyPath, sshUser, homeDir, binPaths); err != nil {
+		return fmt.Errorf("failed to install binaries: %v", err)
+	}
+
+	log.Println("Successfully deployed and installed binaries")
+	return nil
+}
+
+func InstallBinaries(publicDNS, keyPath, sshUser, homeDir string, binPaths []string) error {
+	for _, binPath := range binPaths {
+		binaryName := filepath.Base(binPath)
+
+		installCmd := fmt.Sprintf(`
+			set -e
+			SOURCE_BIN_DIR=%s/bin
+			SOURCE_BIN_OLD_DIR=%s/bin.old
+			DEST_BIN_DIR=/usr/local/bin
+			BINARY_NAME=%s
+
+			# Backup existing binary if it exists
+			if [ -f "$DEST_BIN_DIR/$BINARY_NAME" ]; then
+				mv "$DEST_BIN_DIR/$BINARY_NAME" "$SOURCE_BIN_OLD_DIR/$BINARY_NAME"
+				chmod 0700 "$SOURCE_BIN_OLD_DIR/$BINARY_NAME"
+			fi
+
+			# Move new binary to destination
+			cp "$SOURCE_BIN_DIR/$BINARY_NAME" "$DEST_BIN_DIR/$BINARY_NAME"
+			chown root:root "$DEST_BIN_DIR/$BINARY_NAME"
+			chmod 0755 "$DEST_BIN_DIR/$BINARY_NAME"
+		`, homeDir, homeDir, binaryName)
+
+		if _, err := ExecuteSSHCommand(publicDNS, keyPath, sshUser, installCmd); err != nil {
+			return fmt.Errorf("failed to install binary %s: %v", binaryName, err)
+		}
+	}
+
 	return nil
 }
 
