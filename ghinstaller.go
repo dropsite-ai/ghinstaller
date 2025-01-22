@@ -5,6 +5,7 @@ import (
 	"log"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -21,7 +22,7 @@ func Run(publicDNS, keyPath, sshUser, homeDir string, binPaths []string) error {
 		return fmt.Errorf("failed to create and set up bin directories: %v", err)
 	}
 
-	// Upload binaries concurrently
+	// Upload tar.gz files concurrently
 	var wg sync.WaitGroup
 	for _, binPath := range binPaths {
 		wg.Add(1)
@@ -34,7 +35,7 @@ func Run(publicDNS, keyPath, sshUser, homeDir string, binPaths []string) error {
 	}
 	wg.Wait()
 
-	// Install binaries under /usr/local/bin
+	// Extract tar.gz files and install any resulting binaries
 	if err := InstallBinaries(publicDNS, keyPath, sshUser, homeDir, binPaths); err != nil {
 		return fmt.Errorf("failed to install binaries: %v", err)
 	}
@@ -44,30 +45,44 @@ func Run(publicDNS, keyPath, sshUser, homeDir string, binPaths []string) error {
 }
 
 func InstallBinaries(publicDNS, keyPath, sshUser, homeDir string, binPaths []string) error {
-	for _, binPath := range binPaths {
-		binaryName := filepath.Base(binPath)
+	for _, tarPath := range binPaths {
+		tarFileName := filepath.Base(tarPath)
+		tarFileNameNoExt := strings.TrimSuffix(tarFileName, ".tar.gz")
 
 		installCmd := fmt.Sprintf(`
 			set -e
 			SOURCE_BIN_DIR=%s/bin
-			SOURCE_BIN_OLD_DIR=%s/bin.old
 			DEST_BIN_DIR=/usr/local/bin
-			BINARY_NAME=%s
+			TAR_FILE=%s
+			EXTRACT_DIR=%s/%s
 
-			# Backup existing binary if it exists
-			if [ -f "$DEST_BIN_DIR/$BINARY_NAME" ]; then
-				mv "$DEST_BIN_DIR/$BINARY_NAME" "$SOURCE_BIN_OLD_DIR/$BINARY_NAME"
-				chmod 0700 "$SOURCE_BIN_OLD_DIR/$BINARY_NAME"
-			fi
+			# Extract tar.gz file
+			mkdir -p "$EXTRACT_DIR"
+			tar -xzf "$SOURCE_BIN_DIR/$TAR_FILE" -C "$EXTRACT_DIR"
 
-			# Move new binary to destination
-			cp "$SOURCE_BIN_DIR/$BINARY_NAME" "$DEST_BIN_DIR/$BINARY_NAME"
-			chown root:root "$DEST_BIN_DIR/$BINARY_NAME"
-			chmod 0755 "$DEST_BIN_DIR/$BINARY_NAME"
-		`, homeDir, homeDir, binaryName)
+			# Find and install binaries
+			for file in "$EXTRACT_DIR"/*; do
+				if [ -x "$file" ] && [ ! -d "$file" ]; then
+					BINARY_NAME=$(basename "$file")
+					# Backup existing binary if it exists
+					if [ -f "$DEST_BIN_DIR/$BINARY_NAME" ]; then
+						mv "$DEST_BIN_DIR/$BINARY_NAME" "%s/bin.old/$BINARY_NAME"
+						chmod 0700 "%s/bin.old/$BINARY_NAME"
+					fi
+
+					# Move new binary to destination
+					cp "$file" "$DEST_BIN_DIR/$BINARY_NAME"
+					chown root:root "$DEST_BIN_DIR/$BINARY_NAME"
+					chmod 0755 "$DEST_BIN_DIR/$BINARY_NAME"
+				fi
+			done
+
+			# Cleanup
+			rm -rf "$EXTRACT_DIR"
+		`, homeDir, tarFileName, homeDir, tarFileNameNoExt, homeDir, homeDir)
 
 		if _, err := ExecuteSSHCommand(publicDNS, keyPath, sshUser, installCmd); err != nil {
-			return fmt.Errorf("failed to install binary %s: %v", binaryName, err)
+			return fmt.Errorf("failed to install binaries from %s: %v", tarFileName, err)
 		}
 	}
 
