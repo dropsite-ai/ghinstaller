@@ -30,9 +30,6 @@ func main() {
 	}
 
 	// Validate required arguments
-	if *token == "" {
-		log.Fatal("Error: GitHub Personal Access Token is required. Provide it via the -token flag or set the GITHUB_TOKEN environment variable.")
-	}
 	if *repos == "" {
 		log.Fatal("Error: At least one repository is required. Specify repositories using the -repos flag.")
 	}
