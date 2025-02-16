@@ -1,5 +1,3 @@
-github.com/dropsite-ai/ghdownloader v0.0.0-20250122205730-dd5600da0618 h1:u2DOw3+YlPI1FjvYdKkix4rM4TpHwd67Bg2lfFkChwc=
-github.com/dropsite-ai/ghdownloader v0.0.0-20250122205730-dd5600da0618/go.mod h1:f5GVQWUBObbJdGBQInmpLzIU9K5+yLgNXirs4ngm5Xg=
 github.com/dropsite-ai/ghdownloader v0.0.0-20250216034358-5426296ceb2c h1:g9p8wcUzxO/EEiJlZoG1U7O6PN/PgHYU7diZ+Sptzig=
 github.com/dropsite-ai/ghdownloader v0.0.0-20250216034358-5426296ceb2c/go.mod h1:f5GVQWUBObbJdGBQInmpLzIU9K5+yLgNXirs4ngm5Xg=
 github.com/google/go-cmp v0.5.2/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
