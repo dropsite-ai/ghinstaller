@@ -4,6 +4,12 @@ Install GitHub release binaries onto a server via SCP.
 
 ## Installation
 
+### Go Package
+
+```bash
+go get github.com/dropsite-ai/ghinstaller
+```
+
 ### Homebrew (macOS or Compatible)
 
 If you use Homebrew, install ghinstaller with:
