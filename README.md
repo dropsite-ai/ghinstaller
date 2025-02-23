@@ -1,6 +1,6 @@
 # ghinstaller
 
-Install GitHub release binaries onto a server via SCP.
+Copy GitHub release binaries onto a server via SCP.
 
 ## Installation
 
