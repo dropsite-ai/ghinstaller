@@ -19,7 +19,7 @@ func Run(publicDNS, keyPath, sshUser, uploadDir string, binPaths []string) error
 		go func(p string) {
 			defer wg.Done()
 			if _, err := ExecuteSCPCommand(publicDNS, keyPath, sshUser, uploadDir, p); err != nil {
-				log.Printf("Failed to transfer %s: %v", p, err)
+				log.Fatalf("Failed to transfer %s: %v", p, err)
 			}
 		}(binPath)
 	}
@@ -32,7 +32,7 @@ func Run(publicDNS, keyPath, sshUser, uploadDir string, binPaths []string) error
 // ExecuteSCPCommand uploads a file to the remote server using scp with the no-clobber flag (-n).
 func ExecuteSCPCommand(publicDNS, keyPath, sshUser, uploadDir, binPath string) (string, error) {
 	name := filepath.Base(binPath)
-	cmd := fmt.Sprintf("scp -n -i %s %s %s@%s:%s/%s", keyPath, binPath, sshUser, publicDNS, uploadDir, name)
+	cmd := fmt.Sprintf("scp -i %s %s %s@%s:%s/%s", keyPath, binPath, sshUser, publicDNS, uploadDir, name)
 	return ExecuteCommand(cmd)
 }
 
