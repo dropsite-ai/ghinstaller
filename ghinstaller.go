@@ -12,6 +12,13 @@ import (
 func Run(publicDNS, keyPath, sshUser, uploadDir string, binPaths []string) error {
 	log.Printf("Uploading binaries to server %s@%s into directory %s", sshUser, publicDNS, uploadDir)
 
+	// Ensure the remote directory exists before attempting SCP.
+	sshCmd := fmt.Sprintf("ssh -i %s %s@%s 'mkdir -p %s'",
+		keyPath, sshUser, publicDNS, uploadDir)
+	if _, err := ExecuteCommand(sshCmd); err != nil {
+		return fmt.Errorf("failed to create remote directory %q: %v", uploadDir, err)
+	}
+
 	// Upload files concurrently using scp with no-clobber.
 	var wg sync.WaitGroup
 	for _, binPath := range binPaths {
